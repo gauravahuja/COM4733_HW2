@@ -20,7 +20,7 @@ function  hw2_team_15(serPort)
     state = 0; %Initial State when robot has not touched the wall for the first time
     pause_time = 0.01; %Pause time for all commands
     pause_time_2 = 0.01; %Pause time for main while loop
-    strip_width = 10;
+    strip_width = 0.05;
     
     p = properties(serPort);
     denominator = 22;
@@ -39,7 +39,7 @@ function  hw2_team_15(serPort)
     pause(pause_time);
     
     %parameters to track location
-    coords_target = [0 4 0];
+    coords_target = [0 7 0];
     coords_old = [0 0 0];      %create a vector with x, y, angle coordinates
     coords_new = [0 0 0];
     turn_angle_old = 0;        %setup an angle to be measure according to axis of the initial position in degrees
@@ -65,13 +65,17 @@ function  hw2_team_15(serPort)
         fprintf('[Sensors] w=%d, r=%d, l=%d, f=%d, state=%d\n', WallSensor, BumpRight, BumpLeft, BumpFront, state);
 
         figure(f);
-        plot(coords_new(1), coords_new(2), 'x');
+        plot(-coords_new(1), coords_new(2), 'x');
         hold on;
         
+        if((abs(coords_new(1)) < strip_width && abs(coords_new(2) - coords_target(2)) < strip_width) || coords_new(2) > coords_target(2))
+            fprintf('Destination arrived\n');
+            break;
+        end
+        
+        
         if state == 0
-            %In State 0, We assume that the robot will hit the obstacle
-            %head on, after that it switches to State 1, where it
-            %circumnavigates the obstacle
+            %In State 0, the robot is following the M-line
             fprintf('State 0, Following path\n');
             if(bumped)
                 fprintf('Hit the Obstacle\n');
@@ -85,11 +89,17 @@ function  hw2_team_15(serPort)
 
                 coords_new = coords_old + [(distance*sin(coords_new(3) + turn_angle_new)) (distance * cos(coords_old(3) + turn_angle_new)) (turn_angle_new)];
                 coords_old = coords_new;
-                
-            end
+           else
+                distance = DistanceSensorRoomba(serPort);
+                turn_angle_new = AngleSensorRoomba(serPort);
+
+                coords_new = coords_old + [(distance*sin(coords_new(3) + turn_angle_new)) (distance * cos(coords_old(3) + turn_angle_new)) (turn_angle_new)];
+                coords_old = coords_new;
+           end
+           display(coords_new);
 
         elseif (state == 2)
-            fprintf('State 2, Rotating to align with path\n');
+            fprintf('State 2, Rotating to align with M-line\n');
             current_angle = coords_new(3);
             m = -1;
             if (current_angle < 0)
@@ -99,8 +109,12 @@ function  hw2_team_15(serPort)
             SetFwdVelAngVelCreate(serPort, 0, m*angSpeed);
             
             a2 = AngleSensorRoomba(serPort);
-            angle = coords_old(3) + coords_new(3) + a2;
+            angle = coords_old(3) + a2;
+            display(coords_old);
+            display(coords_new);
+            display(a2);
             fprintf('Angle = %f\n', angle);
+            %input('Paused');
             while ((abs(angle) > 0.1))
                 a2 = AngleSensorRoomba(serPort);
                 angle = angle + a2;
@@ -119,11 +133,12 @@ function  hw2_team_15(serPort)
         
             turn_angle_new = AngleSensorRoomba(serPort);
             coords_new = coords_old + [(distance*sin(coords_new(3) + turn_angle_new)) (distance * cos(coords_old(3) + turn_angle_new)) (turn_angle_new)];
-            display(coords_new);
             coords_old = coords_new;
             total_distance = total_distance + distance;
+            display(coords_new);
+            display(total_distance);
             
-            if(total_distance > 30 && abs(coords_new(1)) < strip_width)
+            if(total_distance > 1 && abs(coords_new(1)) < strip_width)
                 state = 2;         
             end
             
@@ -292,7 +307,7 @@ function  hw2_team_15(serPort)
                                 total_distance = total_distance + distance;
                                 
                                 figure(f);
-                                plot(coords_new(1), coords_new(2), 'rx');
+                                plot(-coords_new(1), coords_new(2), 'rx');
                                 hold on;
 
 
